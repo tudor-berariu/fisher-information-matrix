@@ -6,7 +6,7 @@ from torchvision import datasets, transforms
 
 from fim import fim_diag
 from kfac import kfac
-from models import ConvNet
+from models import ConvNet, MLP
 
 
 def parse_args() -> Namespace:
@@ -22,6 +22,9 @@ def parse_args() -> Namespace:
     parser.add_argument('--mode', type=str, default="diag",
                         choices=["diag", "block", "triblock"],
                         help="Fisher approximation.")
+    parser.add_argument('--model', type=str, default="mlp",
+                        choices=["mlp", "conv"],
+                        help="Model to be used.")
 
     return parser.parse_args()
 
@@ -40,14 +43,25 @@ def main() -> None:
                        ])),
         batch_size=args.batch_size, shuffle=True, **kwargs)
 
-    model = ConvNet().to(device)
+    if args.model == "mlp":
+        Model = MLP
+    elif args.model == "conv":
+        Model = ConvNet
+
+    model = Model().to(device)
 
     if args.mode == "diag":
         fim_diag(model, train_loader, samples_no=args.samples_no,
                  empirical=args.empirical, device=device, verbose=True)
-    elif args.mode == "block":
-        kfac(model, train_loader, samples_no=args.samples_no,
-             empirical=args.empirical, device=device, verbose=True)
+    elif args.mode in ["block", "triblock"]:
+        model.tridiag = (args.mode == "triblock")
+        gaussian_prior = kfac(model, train_loader, samples_no=args.samples_no,
+                              empirical=args.empirical, device=device, verbose=True)
+
+        new_model = Model().to(device)
+
+        crt_params = {name: param for (name, param) in new_model.named_parameters()}
+        gaussian_prior(crt_params)
 
 
 if __name__ == "__main__":
