@@ -1,7 +1,10 @@
 import time
 import sys
+from typing import Dict
+from argparse import Namespace
 
 import torch
+from torch import Tensor
 from torch.distributions import Categorical
 from torch.nn import Module
 from torch.utils.data import DataLoader
@@ -14,7 +17,8 @@ def fim_diag(model: Module,
              samples_no: int = None,
              empirical: bool = False,
              device: torch.device = None,
-             verbose: bool = False):
+             verbose: bool = False,
+             every_n: int = None) -> Dict[int, Dict[str, Tensor]]:
     fim = {}
     for name, param in model.named_parameters():
         if param.requires_grad:
@@ -23,6 +27,8 @@ def fim_diag(model: Module,
     seen_no = 0
     last = 0
     tic = time.time()
+
+    all_fims = dict({})
 
     while samples_no is None or seen_no < samples_no:
         data_iterator = iter(data_loader)
@@ -63,6 +69,10 @@ def fim_diag(model: Module,
                 tic, last = toc, seen_no
                 sys.stdout.write(f"\rSamples: {seen_no:5d}. Fps: {fps:2.4f} samples/s.")
 
+            if every_n and seen_no % every_n == 0:
+                all_fims[seen_no] = {n: f.clone().div_(seen_no).detach_()
+                                     for (n, f) in fim.items()}
+
     if verbose:
         if seen_no > last:
             toc = time.time()
@@ -72,4 +82,6 @@ def fim_diag(model: Module,
     for name, grad2 in fim.items():
         grad2 /= float(seen_no)
 
-    return fim
+    all_fims[seen_no] = fim
+
+    return all_fims

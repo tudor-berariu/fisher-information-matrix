@@ -33,9 +33,9 @@ class ConvNet(KFACModule):
 class MLP(KFACModule):
     def __init__(self, **kwargs):
         super(MLP, self).__init__(**kwargs)
-        self.fc1 = nn.Linear(28 * 28, 50)
-        self.fc2 = nn.Linear(50, 50)
-        self.fc3 = nn.Linear(50, 10)
+        self.fc1 = nn.Linear(3 * 32 * 32, 100)
+        self.fc2 = nn.Linear(100, 100)
+        self.fc3 = nn.Linear(100, 10)
 
     def forward(self, x):
         b_sz = x.size(0)
